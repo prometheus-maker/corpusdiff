@@ -41,3 +41,9 @@ def hungry(path):
 
         time.sleep(5)
     return "ok"
+
+
+def scored(path):
+    """Reports a number about its own output: stored per file as row["metrics"]."""
+    text = open(path).read()
+    return {"text": text, "metrics": {"chars": len(text), "flag": True, "name": "x"}}

@@ -190,3 +190,25 @@ def test_fetch_pins_one_commit(tmp_path, monkeypatch):
     assert all(sha in u for u in seen[1:])  # tree and file downloads use the commit, not the moving ref
     assert (tmp_path / "a.pdf").read_bytes() == b"%PDF-1.4" and not (tmp_path / "b.txt").exists()
     assert _json.loads((tmp_path / ".corpusdiff-source.json").read_text())["commit"] == sha
+
+
+def test_metrics_are_kept_per_file(corpus, tmp_path):
+    out = tmp_path / "r.jsonl"
+    run("scored", corpus, out, "--ext", "txt")
+    r = rows(out)
+    assert r["a.txt"]["metrics"] == {"chars": 5.0}  # booleans and strings are not metrics
+    assert "metrics" not in rows(run_upper(corpus, tmp_path))["a.txt"]
+
+
+def run_upper(corpus, tmp_path):
+    out = tmp_path / "u.jsonl"
+    run("upper", corpus, out)
+    return out
+
+
+def test_summary_shows_metric_means(corpus, tmp_path, capsys):
+    out = tmp_path / "r.jsonl"
+    run("scored", corpus, out, "--ext", "txt")
+    capsys.readouterr()
+    main(["summary", str(out)])
+    assert "metric chars: mean" in capsys.readouterr().out

@@ -60,6 +60,15 @@ def is_empty(out):
     return not repr(out).strip()
 
 
+def metrics(out):
+    """Numbers a target reports about its own output, e.g. {"text": ..., "metrics": {"cer": 0.04}} -> {"cer": 0.04}.
+    Kept per file in the results, so accuracy can be compared across runs like speed."""
+    m = out.get("metrics") if isinstance(out, dict) else None
+    if not isinstance(m, dict):
+        return None
+    return {str(k): float(v) for k, v in m.items() if isinstance(v, (int, float)) and not isinstance(v, bool)} or None
+
+
 def where(exc):
     tb = traceback.extract_tb(exc.__traceback__)
     return [f"{short(fr.filename)}:{fr.lineno} in {fr.name}" for fr in tb][-3:]
@@ -84,6 +93,8 @@ def main():
             out = fn(path)
             data = normalize(out)
             row.update(ok=True, out_len=len(data), out_hash=hashlib.sha1(data).hexdigest()[:16], empty=is_empty(out))
+            if m := metrics(out):
+                row["metrics"] = m
             if save_dir:
                 with open(os.path.join(save_dir, row["out_hash"]), "wb") as f:
                     f.write(data)

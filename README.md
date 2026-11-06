@@ -197,6 +197,17 @@ One JSON line per file:
 import root, and `diff` matches errors by type, file and function, so moved line numbers don't count as changes. `peak_mb` is the worker's peak memory
 so far (exact per file with `--fresh`).
 
+**Accuracy numbers.** If your target returns a dict with a `metrics` dict of numbers, they are stored per file as
+`"metrics"` and `summary` prints their mean, min and max. For example, an OCR target that compares its text with a
+ground-truth file next to each image:
+
+```python
+def tesseract(path):
+    text = pytesseract.image_to_string(path)
+    truth = open(path.rsplit(".", 1)[0] + ".gt.txt").read()
+    return {"text": text, "metrics": {"cer": char_error_rate(text, truth)}}
+```
+
 Linux and macOS. Standard library only.
 
 ## About the author

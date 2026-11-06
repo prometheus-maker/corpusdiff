@@ -212,6 +212,10 @@ def print_summary(rows):
         print(f"  {c:5}  {k}   e.g. {ex}")
     slow = sorted(rows.values(), key=lambda r: -r.get("s", 0))[:5]
     print("  slowest:", ", ".join(f"{r['f']} {r.get('s', 0):.1f}s" for r in slow))
+    names = sorted({k for r in ok for k in r.get("metrics", {})})
+    for k in names:
+        vals = [r["metrics"][k] for r in ok if k in r.get("metrics", {})]
+        print(f"  metric {k}: mean {sum(vals) / len(vals):.4g} over {len(vals)} file(s), min {min(vals):.4g}, max {max(vals):.4g}")
 
 
 def cmd_summary(a):
