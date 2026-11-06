@@ -52,6 +52,14 @@ CORPORA = {
         "github": ("prometheus-maker/ocr-testset", "main", [""]),
         "ext": {".jpg", ".png", ".txt"},
     },
+    "speech": {
+        "what": "130 English speech clips (16 kHz WAV, 14.9 min) with reference transcripts (NAME.gt.txt): audiobooks, "
+        "read sentences, meetings (close and far mic), earnings calls; for speech-to-text accuracy",
+        "home": "https://github.com/prometheus-maker/speech-testset",
+        "licence": "CC BY 4.0; earnings-calls/ CC BY-SA 4.0",
+        "github": ("prometheus-maker/speech-testset", "main", [""]),
+        "ext": {".wav", ".txt"},
+    },
     "fate": {
         "what": "FFmpeg's FATE suite: audio/video samples per codec and container (pick folders with --only)",
         "home": "https://fate-suite.ffmpeg.org/",

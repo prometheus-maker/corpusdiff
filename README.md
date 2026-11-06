@@ -152,6 +152,7 @@ $ corpusdiff summary master.jsonl
 | `pillow` | ~1,000 images: odd modes, truncated, huge, JPEG 2000, TIFF variants | [python-pillow/Pillow](https://github.com/python-pillow/Pillow/tree/main/Tests/images) |
 | `tika` | ~1,200 files with ~290 file extensions from Apache Tika's parser tests: Office, PDF, RTF, EPUB, email, archives, audio, CAD (one folder per Tika module) | [apache/tika](https://github.com/apache/tika) |
 | `ocr` | 190 images with ground-truth text next to each (`NAME.gt.txt`): receipt photos, document pages, app screenshots. For OCR accuracy, with `metrics` (see Results format) | [prometheus-maker/ocr-testset](https://github.com/prometheus-maker/ocr-testset) |
+| `speech` | 130 English speech clips with reference transcripts (`NAME.gt.txt`): audiobooks, read sentences, meetings, earnings calls. For speech-to-text accuracy | [prometheus-maker/speech-testset](https://github.com/prometheus-maker/speech-testset) |
 | `fate` | FFmpeg's sample suite, per codec/container folder (`--only aac,mp3-conformance`) | [fate-suite.ffmpeg.org](https://fate-suite.ffmpeg.org/) |
 
 These files come from bug reports and fuzzers. Some are deliberately broken or hostile (zip bombs, XXE), so run
