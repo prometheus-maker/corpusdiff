@@ -212,3 +212,10 @@ def test_summary_shows_metric_means(corpus, tmp_path, capsys):
     capsys.readouterr()
     main(["summary", str(out)])
     assert "metric chars: mean" in capsys.readouterr().out
+
+
+def test_ground_truth_files_are_not_inputs(tmp_path):
+    from corpusdiff.cli import files_in
+    (tmp_path / "a.txt").write_text("hello")
+    (tmp_path / "a.gt.txt").write_text("en")
+    assert [p.name for p in files_in(tmp_path, {"txt"})] == ["a.txt"]

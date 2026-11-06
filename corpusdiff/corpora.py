@@ -60,6 +60,14 @@ CORPORA = {
         "github": ("prometheus-maker/speech-testset", "main", [""]),
         "ext": {".wav", ".txt"},
     },
+    "langid": {
+        "what": "760 texts in 38 languages (single sentences and 5-sentence paragraphs from Tatoeba) with their ISO "
+        "639-1 code in NAME.gt.txt; for language detection accuracy",
+        "home": "https://github.com/prometheus-maker/langid-testset",
+        "licence": "CC BY 2.0 FR (Tatoeba authors, credited in manifest.tsv)",
+        "github": ("prometheus-maker/langid-testset", "main", [""]),
+        "ext": {".txt"},
+    },
     "fate": {
         "what": "FFmpeg's FATE suite: audio/video samples per codec and container (pick folders with --only)",
         "home": "https://fate-suite.ffmpeg.org/",

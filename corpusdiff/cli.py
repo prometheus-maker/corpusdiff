@@ -119,6 +119,8 @@ class Worker:
 def files_in(root, exts):
     root = Path(root)
     for p in sorted(root.rglob("*")):
+        if p.name.endswith(".gt.txt"):  # ground truth next to an input (scored corpora), never an input itself
+            continue
         if p.is_file() and not p.name.startswith(".") and (not exts or p.suffix.lower().lstrip(".") in exts):
             yield p
 

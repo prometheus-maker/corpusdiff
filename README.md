@@ -153,6 +153,7 @@ $ corpusdiff summary master.jsonl
 | `tika` | ~1,200 files with ~290 file extensions from Apache Tika's parser tests: Office, PDF, RTF, EPUB, email, archives, audio, CAD (one folder per Tika module) | [apache/tika](https://github.com/apache/tika) |
 | `ocr` | 190 images with ground-truth text next to each (`NAME.gt.txt`): receipt photos, document pages, app screenshots. For OCR accuracy, with `metrics` (see Results format) | [prometheus-maker/ocr-testset](https://github.com/prometheus-maker/ocr-testset) |
 | `speech` | 130 English speech clips with reference transcripts (`NAME.gt.txt`): audiobooks, read sentences, meetings, earnings calls. For speech-to-text accuracy | [prometheus-maker/speech-testset](https://github.com/prometheus-maker/speech-testset) |
+| `langid` | 760 texts in 38 languages with their language code (`NAME.gt.txt`), from Tatoeba. For language detection accuracy | [prometheus-maker/langid-testset](https://github.com/prometheus-maker/langid-testset) |
 | `fate` | FFmpeg's sample suite, per codec/container folder (`--only aac,mp3-conformance`) | [fate-suite.ffmpeg.org](https://fate-suite.ffmpeg.org/) |
 
 These files come from bug reports and fuzzers. Some are deliberately broken or hostile (zip bombs, XXE), so run
@@ -199,7 +200,8 @@ One JSON line per file:
 import root, and `diff` matches errors by type, file and function, so moved line numbers don't count as changes. `peak_mb` is the worker's peak memory
 so far (exact per file with `--fresh`).
 
-**Accuracy numbers.** If your target returns a dict with a `metrics` dict of numbers, they are stored per file as
+**Accuracy numbers.** Files named `*.gt.txt` hold ground truth for the input next to them and are never run as
+inputs. If your target returns a dict with a `metrics` dict of numbers, they are stored per file as
 `"metrics"` and `summary` prints their mean, min and max. For example, an OCR target that compares its text with a
 ground-truth file next to each image:
 
