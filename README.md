@@ -31,7 +31,7 @@ changes.
 
 Your own test fixtures are the files you thought of. Big projects keep collections of the files their *users*
 broke them with: pdf.js has about 1,000 PDFs from bug reports, Apache POI about 650 Office files, Pillow about 1,000
-odd images, Apache Tika about 1,200 files in 100 formats, FFmpeg a whole sample suite. If you parse any of those formats, those collections are free regression
+odd images, Apache Tika about 1,200 files with ~290 file extensions, FFmpeg a whole sample suite. If you parse any of those formats, those collections are free regression
 tests. `corpusdiff` makes using them a three-command job:
 
 ```bash
@@ -108,7 +108,7 @@ $ corpusdiff summary master.jsonl
 | `pdfjs` | ~1,000 PDFs from pdf.js bug reports: fonts, encodings, broken xref tables, encryption | [mozilla/pdf.js](https://github.com/mozilla/pdf.js/tree/master/test/pdfs) |
 | `poi` | ~650 Word, Excel and PowerPoint files: real bug files, encrypted, malformed, XXE | [apache/poi](https://github.com/apache/poi/tree/trunk/test-data) |
 | `pillow` | ~1,000 images: odd modes, truncated, huge, JPEG 2000, TIFF variants | [python-pillow/Pillow](https://github.com/python-pillow/Pillow/tree/main/Tests/images) |
-| `tika` | ~1,200 files in ~100 formats from Apache Tika's parser tests: Office, PDF, RTF, EPUB, email, archives, audio, CAD (one folder per Tika module) | [apache/tika](https://github.com/apache/tika) |
+| `tika` | ~1,200 files with ~290 file extensions from Apache Tika's parser tests: Office, PDF, RTF, EPUB, email, archives, audio, CAD (one folder per Tika module) | [apache/tika](https://github.com/apache/tika) |
 | `fate` | FFmpeg's sample suite, per codec/container folder (`--only aac,mp3-conformance`) | [fate-suite.ffmpeg.org](https://fate-suite.ffmpeg.org/) |
 
 These files come from bug reports and fuzzers. Some are deliberately broken or hostile (zip bombs, XXE), so run

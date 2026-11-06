@@ -37,8 +37,8 @@ CORPORA = {
         "ext": None,
     },
     "tika": {
-        "what": "~1,200 files in ~100 formats from Apache Tika's parser tests (Office, PDF, RTF, EPUB, email, "
-        "archives, audio, CAD), one folder per Tika module",
+        "what": "~1,200 files with ~290 file extensions from Apache Tika's parser tests (Office, PDF, RTF, EPUB, "
+        "email, archives, audio, CAD), one folder per Tika module",
         "home": "https://github.com/apache/tika",
         "licence": "Apache-2.0; files vary",
         "github": ("apache/tika", "main", {"marker": "/src/test/resources/test-documents/"}),
