@@ -4,8 +4,11 @@ on:
   workflow_dispatch:
   push:
     paths: [action.yml, corpusdiff/**, examples/pdf_libs.py, .github/workflows/action-selftest.yml]
+  pull_request:
+    paths: [action.yml, corpusdiff/**, examples/pdf_libs.py, .github/workflows/action-selftest.yml]
 permissions:
   contents: read
+  pull-requests: write  # for comment: "true"
 jobs:
   corpus:
     runs-on: ubuntu-latest
@@ -24,4 +27,5 @@ jobs:
           install: pip install -q pypdf
           rerun: "true"
           fail-on-broke: "false"
+          comment: "true"
       - run: echo "${{ steps.cd.outputs.summary }}"

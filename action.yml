@@ -32,6 +32,12 @@ inputs:
   fail-on-broke:
     description: "Fail the step if any file broke or became empty ('true'/'false')"
     default: "true"
+  comment:
+    description: "Post the report as a pull request comment, updated in place on later pushes ('true'/'false'; needs pull-requests: write)"
+    default: "false"
+  github-token:
+    description: "Token used for the comment"
+    default: ${{ github.token }}
 outputs:
   summary:
     description: "First line of the diff, e.g. '1068 files in both runs: broke 1, fixed 2, same 1065'"
@@ -107,7 +113,6 @@ runs:
       shell: bash
       env:
         IN_RERUN: ${{ inputs.rerun }}
-        IN_FAIL: ${{ inputs.fail-on-broke }}
       run: |
         out="$RUNNER_TEMP/cd-results"
         extra=(); [ "$IN_RERUN" = "true" ] && extra=(--rerun "$out/base2.jsonl")
@@ -119,4 +124,37 @@ runs:
         echo "summary=$(head -n 1 "$out/diff.txt")" >> "$GITHUB_OUTPUT"
         "$CD" diff "$out/base.jsonl" "$out/head.jsonl" "${extra[@]}" --outputs "$out/outputs" --lines 8 --markdown > "$out/diff.md" || true
         head -c 60000 "$out/diff.md" >> "$GITHUB_STEP_SUMMARY"
-        if [ "$rc" -ne 0 ] && [ "$IN_FAIL" = "true" ]; then echo "::error::corpusdiff: files broke or became empty"; exit 1; fi
+        echo "rc=$rc" >> "$GITHUB_OUTPUT"
+    - name: Comment on the pull request
+      if: inputs.comment == 'true' && github.event.pull_request.number
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        API: ${{ github.api_url }}/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments
+        REPORT: ${{ runner.temp }}/cd-results/diff.md
+      run: |
+        python3 - <<'PY'
+        import json, os, urllib.request
+        MARK = "<!-- corpusdiff-report -->"
+        body = MARK + "\n" + open(os.environ["REPORT"], encoding="utf-8").read()[:60000]
+        def call(url, data=None, method=None):
+            req = urllib.request.Request(url, data=json.dumps(data).encode() if data else None, method=method, headers={
+                "Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json"})
+            return json.load(urllib.request.urlopen(req, timeout=30))
+        try:
+            old = [c for page in range(1, 11) for c in call(f"{os.environ['API']}?per_page=100&page={page}")
+                   if MARK in (c.get("body") or "")][:1]
+            if old:
+                print("updated", call(old[0]["url"], {"body": body}, "PATCH")["html_url"])
+            else:
+                print("posted", call(os.environ["API"], {"body": body}, "POST")["html_url"])
+        except urllib.error.HTTPError as e:  # e.g. a PR from a fork gets a read-only token
+            print(f"::warning::corpusdiff: could not comment on the pull request ({e.code} {e.reason}); "
+                  "the report is in the job summary. Give the job 'permissions: pull-requests: write'.")
+        PY
+    - name: Fail if files broke
+      if: steps.diff.outputs.rc != '0' && inputs.fail-on-broke == 'true'
+      shell: bash
+      run: |
+        echo "::error::corpusdiff: files broke or became empty"
+        exit 1
