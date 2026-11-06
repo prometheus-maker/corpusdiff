@@ -154,6 +154,7 @@ $ corpusdiff summary master.jsonl
 | `ocr` | 190 images with ground-truth text next to each (`NAME.gt.txt`): receipt photos, document pages, app screenshots. For OCR accuracy, with `metrics` (see Results format) | [prometheus-maker/ocr-testset](https://github.com/prometheus-maker/ocr-testset) |
 | `speech` | 130 English speech clips with reference transcripts (`NAME.gt.txt`): audiobooks, read sentences, meetings, earnings calls. For speech-to-text accuracy | [prometheus-maker/speech-testset](https://github.com/prometheus-maker/speech-testset) |
 | `langid` | 760 texts in 38 languages with their language code (`NAME.gt.txt`), from Tatoeba. For language detection accuracy | [prometheus-maker/langid-testset](https://github.com/prometheus-maker/langid-testset) |
+| `olmocr` | [olmOCR-bench](https://huggingface.co/datasets/allenai/olmOCR-bench): one-page PDFs with verified checks for PDF-to-Markdown quality (`*.jsonl`). Downloaded from Hugging Face at a pinned revision; `--files LIST` picks a sample | [allenai/olmOCR-bench](https://huggingface.co/datasets/allenai/olmOCR-bench) |
 | `fate` | FFmpeg's sample suite, per codec/container folder (`--only aac,mp3-conformance`) | [fate-suite.ffmpeg.org](https://fate-suite.ffmpeg.org/) |
 
 These files come from bug reports and fuzzers. Some are deliberately broken or hostile (zip bombs, XXE), so run

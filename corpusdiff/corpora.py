@@ -68,6 +68,14 @@ CORPORA = {
         "github": ("prometheus-maker/langid-testset", "main", [""]),
         "ext": {".txt"},
     },
+    "olmocr": {
+        "what": "olmOCR-bench (AI2): one-page PDFs with verified checks for PDF-to-Markdown quality (text present/absent, "
+        "reading order, table cells); the checks are the bench_data/*.jsonl files. Pick pages with --files",
+        "home": "https://huggingface.co/datasets/allenai/olmOCR-bench",
+        "licence": "ODC-BY-1.0 (dataset); PDFs from their original sources",
+        "hf": ("allenai/olmOCR-bench", "main", "bench_data/"),
+        "ext": {".pdf", ".jsonl"},
+    },
     "fate": {
         "what": "FFmpeg's FATE suite: audio/video samples per codec and container (pick folders with --only)",
         "home": "https://fate-suite.ffmpeg.org/",
@@ -96,7 +104,20 @@ def rel_path(path, where):
     return next((path[len(p) :] for p in where if path.startswith(p)), None)
 
 
-def fetch(name, dest, only=None, ref=None):
+def _hf_files(repo, rev, prefix):
+    """All file paths under prefix in a Hugging Face dataset at revision rev (the tree API pages by 1,000)."""
+    url = f"https://huggingface.co/api/datasets/{repo}/tree/{rev}/{urllib.parse.quote(prefix.rstrip('/'))}?recursive=true"
+    out = []
+    while url:
+        req = urllib.request.Request(url, headers={"User-Agent": "corpusdiff"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            out += [f["path"] for f in json.loads(r.read()) if f.get("type") == "file"]
+            nxt = [p.split(";")[0].strip("<> ") for p in (r.headers.get("Link") or "").split(",") if 'rel="next"' in p]
+        url = nxt[0] if nxt else None
+    return out
+
+
+def fetch(name, dest, only=None, ref=None, files=None):
     """Download corpus `name` into dest. ref: branch, tag or commit (default: the corpus's main branch).
     The commit actually used is written to dest/.corpusdiff-source.json, so a run can be repeated exactly."""
     if name not in CORPORA:
@@ -112,6 +133,11 @@ def fetch(name, dest, only=None, ref=None):
                 ["rsync", "-a", "--timeout=120", c["rsync"] + d.strip() + "/", str(dest / d.strip())], check=True
             )
         return
+    keep = None
+    if files:  # a list of corpus-relative paths (one per line): download only those
+        keep = {ln.strip() for ln in Path(files).read_text().splitlines() if ln.strip() and not ln.startswith("#")}
+    if "hf" in c:
+        return _fetch_hf(name, c, dest, ref, keep)
     repo, branch, where = c["github"]
     sha = json.loads(_get(f"https://api.github.com/repos/{repo}/commits/{urllib.parse.quote(ref or branch)}"))["sha"]
     ref = sha  # every file from the same commit, even if the branch moves during the download
@@ -122,7 +148,8 @@ def fetch(name, dest, only=None, ref=None):
     want = {}  # repo path -> local relative path
     for t in tree["tree"]:
         rel = rel_path(t["path"], where) if t["type"] == "blob" else None
-        if rel and (c["ext"] is None or Path(rel).suffix.lower() in c["ext"]) and (not subs or rel.startswith(subs)):
+        if rel and (c["ext"] is None or Path(rel).suffix.lower() in c["ext"]) and (not subs or rel.startswith(subs)) \
+                and (keep is None or rel in keep or rel.endswith(".jsonl")):
             want[t["path"]] = rel
 
     def one(path):
@@ -145,4 +172,38 @@ def fetch(name, dest, only=None, ref=None):
         new = sum(ex.map(one, want))
     print(f"downloaded {new}, already had {len(want) - new} (commit {sha[:12]})", file=sys.stderr)
     src = {"corpus": name, "repo": repo, "commit": sha, "files": len(want), "only": only}
+    (dest / ".corpusdiff-source.json").write_text(json.dumps(src, indent=1) + "\n")
+
+
+def _fetch_hf(name, c, dest, ref, keep):
+    """Hugging Face dataset corpus: the revision (ref or the default branch) is resolved to a commit first."""
+    repo, branch, prefix = c["hf"]
+    info = json.loads(_get(f"https://huggingface.co/api/datasets/{repo}/revision/{urllib.parse.quote(ref or branch)}"))
+    sha = info["sha"]
+    want = {}
+    for path in _hf_files(repo, sha, prefix):
+        rel = path[len(prefix):]
+        if Path(rel).suffix.lower() in c["ext"] and (keep is None or rel in keep or rel.endswith(".jsonl")):
+            want[path] = rel
+
+    def one(path):
+        out = dest / want[path]
+        if out.exists():
+            return 0
+        out.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            data = _get(f"https://huggingface.co/datasets/{repo}/resolve/{sha}/{urllib.parse.quote(path)}", timeout=120)
+        except Exception as e:  # noqa: BLE001 - one bad file must not stop the download
+            print(f"  failed: {path}: {e}", file=sys.stderr)
+            return 0
+        tmp = out.with_name("." + out.name + ".part")
+        tmp.write_bytes(data)
+        tmp.replace(out)
+        return 1
+
+    print(f"{len(want)} files from huggingface.co/datasets/{repo} -> {dest}", file=sys.stderr)
+    with ThreadPoolExecutor(8) as ex:
+        new = sum(ex.map(one, want))
+    print(f"downloaded {new}, already had {len(want) - new} (revision {sha[:12]})", file=sys.stderr)
+    src = {"corpus": name, "repo": f"hf:{repo}", "commit": sha, "files": len(want)}
     (dest / ".corpusdiff-source.json").write_text(json.dumps(src, indent=1) + "\n")
