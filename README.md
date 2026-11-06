@@ -70,7 +70,7 @@ jobs:
 
 The corpus is cached between runs. Inputs: `target`, `corpus`, `install`, `base` (default: the PR's base),
 `jobs`, `timeout`, `ext`, `rerun`, `fail-on-broke`. [action-selftest.yml](.github/workflows/action-selftest.yml)
-runs it on this repo with pypdf over all 1,068 pdf.js PDFs.
+runs it on this repo with pypdf over all pdf.js test PDFs (1,077 on 2026-11-06, about 2.5 minutes).
 
 ## What it handles for you
 
