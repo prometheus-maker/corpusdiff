@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -35,6 +36,14 @@ CORPORA = {
         "github": ("python-pillow/Pillow", "main", ["Tests/images/"]),
         "ext": None,
     },
+    "tika": {
+        "what": "~1,200 files in ~100 formats from Apache Tika's parser tests (Office, PDF, RTF, EPUB, email, "
+        "archives, audio, CAD), one folder per Tika module",
+        "home": "https://github.com/apache/tika",
+        "licence": "Apache-2.0; files vary",
+        "github": ("apache/tika", "main", {"marker": "/src/test/resources/test-documents/"}),
+        "ext": None,
+    },
     "fate": {
         "what": "FFmpeg's FATE suite: audio/video samples per codec and container (pick folders with --only)",
         "home": "https://fate-suite.ffmpeg.org/",
@@ -53,6 +62,16 @@ def _get(url, timeout=60):
         return r.read()
 
 
+def rel_path(path, where):
+    """Local path for a repo file, or None if it isn't part of the corpus.
+    where = list of folder prefixes, or {"marker": "/test-documents/"} for test folders spread over many modules
+    (the local path is then module-folder/rest)."""
+    if isinstance(where, dict):
+        head, sep, rest = path.partition(where["marker"])
+        return f"{head.rsplit('/', 1)[-1]}/{rest}" if sep and rest else None
+    return next((path[len(p) :] for p in where if path.startswith(p)), None)
+
+
 def fetch(name, dest, only=None):
     if name not in CORPORA:
         raise SystemExit(f"unknown corpus {name!r}; known: {', '.join(CORPORA)}")
@@ -67,30 +86,25 @@ def fetch(name, dest, only=None):
                 ["rsync", "-a", "--timeout=120", c["rsync"] + d.strip() + "/", str(dest / d.strip())], check=True
             )
         return
-    repo, ref, prefixes = c["github"]
+    repo, ref, where = c["github"]
     tree = json.loads(_get(f"https://api.github.com/repos/{repo}/git/trees/{ref}?recursive=1"))
     if tree.get("truncated"):
         print("warning: GitHub returned a truncated file list", file=sys.stderr)
-    want = [
-        t["path"]
-        for t in tree["tree"]
-        if t["type"] == "blob"
-        and any(t["path"].startswith(p) for p in prefixes)
-        and (c["ext"] is None or Path(t["path"]).suffix.lower() in c["ext"])
-    ]
-    if only:
-        subs = tuple(o.strip().strip("/") + "/" for o in only.split(","))
-        want = [p for p in want if any(p[len(pre) :].startswith(subs) for pre in prefixes if p.startswith(pre))]
+    subs = tuple(o.strip().strip("/") + "/" for o in only.split(",")) if only else None
+    want = {}  # repo path -> local relative path
+    for t in tree["tree"]:
+        rel = rel_path(t["path"], where) if t["type"] == "blob" else None
+        if rel and (c["ext"] is None or Path(rel).suffix.lower() in c["ext"]) and (not subs or rel.startswith(subs)):
+            want[t["path"]] = rel
 
     def one(path):
-        rel = next(path[len(p) :] for p in prefixes if path.startswith(p))
-        out = dest / rel
+        out = dest / want[path]
         if out.exists():
             return 0
         out.parent.mkdir(parents=True, exist_ok=True)
         try:
-            data = _get(f"https://raw.githubusercontent.com/{repo}/{ref}/{path}")
-        except OSError as e:
+            data = _get(f"https://raw.githubusercontent.com/{repo}/{ref}/{urllib.parse.quote(path)}")
+        except Exception as e:  # noqa: BLE001 - one bad file must not stop the download
             print(f"  failed: {path}: {e}", file=sys.stderr)
             return 0
         tmp = out.with_name("." + out.name + ".part")

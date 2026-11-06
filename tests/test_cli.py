@@ -107,3 +107,14 @@ def test_diff_shows_what_changed_in_saved_outputs(corpus, tmp_path, capsys):
     out = capsys.readouterr().out
     assert "output-changed  a.txt" in out and "|   text:" not in out
     assert "| +  WORLD" in out
+
+
+def test_corpus_paths():
+    from corpusdiff.corpora import rel_path
+
+    marker = {"marker": "/src/test/resources/test-documents/"}
+    p = "tika-parsers/std/tika-parser-pdf-module/src/test/resources/test-documents/a b.pdf"
+    assert rel_path(p, marker) == "tika-parser-pdf-module/a b.pdf"
+    assert rel_path("tika-core/src/main/x.java", marker) is None
+    assert rel_path("test/pdfs/x.pdf", ["test/pdfs/"]) == "x.pdf"
+    assert rel_path("src/x.pdf", ["test/pdfs/"]) is None
