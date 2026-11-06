@@ -47,6 +47,19 @@ def short(filename):
     return next((filename[len(r) :] for r in roots if filename.startswith(r)), filename)
 
 
+def is_empty(out):
+    """No text anywhere: None, blank str/bytes, or containers whose strings are all blank ({"pages": 3, "text": ""})."""
+    if out is None:
+        return True
+    if isinstance(out, (str, bytes)):
+        return not out.strip()
+    if isinstance(out, dict):
+        return all(is_empty(v) for v in out.values() if not isinstance(v, (int, float, bool)))
+    if isinstance(out, (list, tuple)):
+        return all(is_empty(v) for v in out if not isinstance(v, (int, float, bool)))
+    return not repr(out).strip()
+
+
 def where(exc):
     tb = traceback.extract_tb(exc.__traceback__)
     return [f"{short(fr.filename)}:{fr.lineno} in {fr.name}" for fr in tb][-3:]
@@ -68,10 +81,9 @@ def main():
         t = time.perf_counter()
         row = {}
         try:
-            data = normalize(fn(path))
-            row.update(
-                ok=True, out_len=len(data), out_hash=hashlib.sha1(data).hexdigest()[:16], empty=len(data.strip()) == 0
-            )
+            out = fn(path)
+            data = normalize(out)
+            row.update(ok=True, out_len=len(data), out_hash=hashlib.sha1(data).hexdigest()[:16], empty=is_empty(out))
             if save_dir:
                 with open(os.path.join(save_dir, row["out_hash"]), "wb") as f:
                     f.write(data)

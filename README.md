@@ -141,7 +141,7 @@ One JSON line per file:
  "where": ["pdfminer/pdfdocument.py:353 in init", "pdfminer/pdfdocument.py:552 in init_params", "pdfminer/pdfdocument.py:490 in init_params"], "s": 0.001, "peak_mb": 118}
 ```
 
-`ok`, `out_len`, `out_hash`, `empty` for successes; `etype`, `msg`, `where` (last 3 frames) for failures;
+`ok`, `out_len`, `out_hash`, `empty` (no text anywhere in the result, e.g. `{"pages": 3, "text": ""}`) for successes; `etype`, `msg`, `where` (last 3 frames) for failures;
 `etype` is `TIMEOUT` or `CRASH` when the worker had to be killed or died. Stack frames are shown relative to the
 import root, and `diff` matches errors by type, file and function, so moved line numbers don't count as changes. `peak_mb` is the worker's peak memory
 so far (exact per file with `--fresh`).

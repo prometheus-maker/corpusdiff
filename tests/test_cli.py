@@ -118,3 +118,11 @@ def test_corpus_paths():
     assert rel_path("tika-core/src/main/x.java", marker) is None
     assert rel_path("test/pdfs/x.pdf", ["test/pdfs/"]) == "x.pdf"
     assert rel_path("src/x.pdf", ["test/pdfs/"]) is None
+
+
+def test_empty_means_no_text_anywhere():
+    from corpusdiff.worker import is_empty
+
+    assert is_empty(None) and is_empty("  \n") and is_empty(b"") and is_empty({"pages": 3, "text": ""})
+    assert is_empty([{"text": " "}, 7]) and is_empty({})
+    assert not is_empty("x") and not is_empty({"pages": 0, "text": "a"}) and not is_empty([["", "b"]])
