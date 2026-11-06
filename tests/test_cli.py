@@ -165,3 +165,28 @@ def test_markdown_report_for_pr_comments(corpus, tmp_path, capsys):
     assert main(["diff", str(tmp_path / "o.jsonl"), str(tmp_path / "n.jsonl"), "--markdown"]) == 1
     out = capsys.readouterr().out
     assert "❌ 1 file(s) broke" in out and "| ❌ broke | `a\\|b'.txt` |" in out and "x \\| y" in out
+
+
+def test_fetch_pins_one_commit(tmp_path, monkeypatch):
+    """--ref resolves to one commit; every file is read from that commit; the commit is saved next to the files."""
+    import json as _json
+    from corpusdiff import corpora
+
+    seen = []
+
+    def fake_get(url, timeout=60):
+        seen.append(url)
+        if "/commits/" in url:
+            return _json.dumps({"sha": "abc123" * 6 + "abcd"}).encode()
+        if "/git/trees/" in url:
+            return _json.dumps({"tree": [{"type": "blob", "path": "test/pdfs/a.pdf"},
+                                         {"type": "blob", "path": "test/pdfs/b.txt"}]}).encode()
+        return b"%PDF-1.4"
+
+    monkeypatch.setattr(corpora, "_get", fake_get)
+    corpora.fetch("pdfjs", tmp_path, ref="v4.0")
+    sha = "abc123" * 6 + "abcd"
+    assert seen[0].endswith("/commits/v4.0")
+    assert all(sha in u for u in seen[1:])  # tree and file downloads use the commit, not the moving ref
+    assert (tmp_path / "a.pdf").read_bytes() == b"%PDF-1.4" and not (tmp_path / "b.txt").exists()
+    assert _json.loads((tmp_path / ".corpusdiff-source.json").read_text())["commit"] == sha
