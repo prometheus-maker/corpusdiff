@@ -30,3 +30,14 @@ def empty(path):
 def lines(path):
     text = open(path).read()
     return {"n": len(text), "text": text.upper() + "\n"}
+
+
+def hungry(path):
+    if "big" in open(path).read():
+        block = bytearray(400 * 2**20)  # touched, so it is resident
+        for i in range(0, len(block), 4096):
+            block[i] = 1
+        import time
+
+        time.sleep(5)
+    return "ok"

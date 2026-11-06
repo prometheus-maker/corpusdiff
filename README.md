@@ -78,7 +78,7 @@ runs it on this repo with pypdf over all pdf.js test PDFs (1,077 on 2026-11-06, 
 |---|---|
 | One file hangs forever | `--timeout` per file (default 120 s); the worker is killed, the row says `TIMEOUT` |
 | A C extension segfaults | The worker dies, the row says `CRASH: worker died: SIGSEGV`, a new worker takes over |
-| One file eats all memory | `--mem-mb` caps each worker; the run goes on |
+| One file eats all memory | `--mem-mb` kills a worker whose resident memory passes the limit; the row says `MEMORY`, the run goes on |
 | Slow imports (models, big libraries) | Workers import your code once and stay alive (`--fresh` for a new process per file) |
 | The run gets interrupted | Every result is written as soon as it is known; run the same command again to resume |
 | Your code prints to stdout | Prints are kept away from the results (`--show-stderr` to see them) |
@@ -177,7 +177,7 @@ One JSON line per file:
 ```
 
 `ok`, `out_len`, `out_hash`, `empty` (no text anywhere in the result, e.g. `{"pages": 3, "text": ""}`) for successes; `etype`, `msg`, `where` (last 3 frames) for failures;
-`etype` is `TIMEOUT` or `CRASH` when the worker had to be killed or died. Stack frames are shown relative to the
+`etype` is `TIMEOUT`, `MEMORY` or `CRASH` when the worker had to be killed or died. Stack frames are shown relative to the
 import root, and `diff` matches errors by type, file and function, so moved line numbers don't count as changes. `peak_mb` is the worker's peak memory
 so far (exact per file with `--fresh`).
 

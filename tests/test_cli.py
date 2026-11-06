@@ -126,3 +126,17 @@ def test_empty_means_no_text_anywhere():
     assert is_empty(None) and is_empty("  \n") and is_empty(b"") and is_empty({"pages": 3, "text": ""})
     assert is_empty([{"text": " "}, 7]) and is_empty({})
     assert not is_empty("x") and not is_empty({"pages": 0, "text": "a"}) and not is_empty([["", "b"]])
+
+
+def test_memory_limit_kills_only_the_hungry_file(tmp_path):
+    d = tmp_path / "m"
+    d.mkdir()
+    (d / "a.txt").write_text("small")
+    (d / "b.txt").write_text("big")
+    out = tmp_path / "m.jsonl"
+    main(
+        ["run", f"{HERE / 'targets.py'}:hungry", str(d), "-o", str(out), "-q", "-t", "20", "--mem-mb", "200", "-j", "1"]
+    )
+    r = rows(out)
+    assert r["a.txt"]["ok"]
+    assert r["b.txt"]["etype"] == "MEMORY" and r["b.txt"]["s"] < 5

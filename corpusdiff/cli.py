@@ -26,6 +26,20 @@ WORKER = Path(__file__).with_name("worker.py")
 
 
 # ---------------------------------------------------------------- run
+def rss_mb(pid):
+    """Resident memory of a process in MB (Linux /proc, else ps). 0 if it can't be read."""
+    try:
+        with open(f"/proc/{pid}/statm") as f:
+            return int(f.read().split()[1]) * os.sysconf("SC_PAGE_SIZE") / 2**20
+    except OSError:
+        pass
+    try:
+        out = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True, timeout=5).stdout
+        return int(out.strip() or 0) / 1024
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0
+
+
 class Worker:
     def __init__(self, a):
         self.a = a
@@ -36,14 +50,6 @@ class Worker:
         if self.a.path:
             env["CORPUSDIFF_PATH"] = os.pathsep.join(os.path.abspath(p) for p in self.a.path)
 
-        def limits():
-            os.setsid()
-            if self.a.mem_mb:
-                import resource
-
-                b = self.a.mem_mb * 2**20
-                resource.setrlimit(resource.RLIMIT_AS, (b, b))
-
         self.p = subprocess.Popen(
             [self.a.python, "-I", str(WORKER), self.a.target, self.a.save_outputs or ""],
             stdin=subprocess.PIPE,
@@ -52,7 +58,7 @@ class Worker:
             bufsize=1,
             env=env,
             stderr=None if self.a.show_stderr else subprocess.DEVNULL,
-            preexec_fn=limits,
+            start_new_session=True,
         )
         first = self.read(self.a.start_timeout)
         if not (first and first.get("ready")):
@@ -60,11 +66,18 @@ class Worker:
             raise SystemExit(f"worker did not start (exit code {code}). Run again with --show-stderr to see why.")
 
     def read(self, timeout):
-        r, _, _ = select.select([self.p.stdout], [], [], timeout)
-        if not r:
-            return None
-        line = self.p.stdout.readline()
-        return json.loads(line) if line else {}
+        """Next result line; None at the deadline; "MEMORY" if the worker grew past --mem-mb; {} if it died."""
+        deadline = time.monotonic() + timeout
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return None
+            r, _, _ = select.select([self.p.stdout], [], [], min(left, 0.25) if self.a.mem_mb else left)
+            if r:
+                line = self.p.stdout.readline()
+                return json.loads(line) if line else {}
+            if self.a.mem_mb and rss_mb(self.p.pid) > self.a.mem_mb:
+                return "MEMORY"
 
     def kill(self):
         if self.p and self.p.poll() is None:
@@ -86,6 +99,10 @@ class Worker:
             row = self.read(self.a.timeout)
         except BrokenPipeError:
             row = {}
+        if row == "MEMORY":
+            self.kill()
+            dt = round(time.perf_counter() - t, 3)
+            return {"ok": False, "etype": "MEMORY", "msg": f"worker used more than {self.a.mem_mb} MB", "s": dt}
         if row:
             if self.a.fresh:
                 self.kill()
@@ -96,8 +113,7 @@ class Worker:
             return {"ok": False, "etype": "TIMEOUT", "msg": f"no result after {self.a.timeout} s", "s": dt}
         code = self.kill()  # the worker died while on this file
         name = signal.Signals(-code).name if code and code < 0 else f"exit {code}"
-        hint = " (memory limit?)" if self.a.mem_mb else ""
-        return {"ok": False, "etype": "CRASH", "msg": f"worker died: {name}{hint}", "s": dt}
+        return {"ok": False, "etype": "CRASH", "msg": f"worker died: {name}", "s": dt}
 
 
 def files_in(root, exts):
@@ -364,7 +380,12 @@ def main(argv=None):
     r.add_argument(
         "-t", "--timeout", type=float, default=120, help="seconds per file before the worker is killed (120)"
     )
-    r.add_argument("--mem-mb", type=int, default=0, help="address-space limit per worker in MB (0 = none)")
+    r.add_argument(
+        "--mem-mb",
+        type=int,
+        default=0,
+        help="kill a worker whose memory (RSS) passes N MB; the file is recorded as MEMORY (0 = no limit)",
+    )
     r.add_argument("--ext", help="only these extensions, e.g. pdf,docx")
     r.add_argument("--limit", type=int, default=0, help="only the first N files (quick try)")
     r.add_argument("--python", default=sys.executable, help="interpreter for the workers (e.g. your venv's python)")
