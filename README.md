@@ -51,6 +51,10 @@ Whatever it returns (text, bytes, dict, list) is hashed, so "output changed" mea
 Check every pull request against a corpus: the action installs your project at the PR's base and at its head,
 runs both over the corpus, and puts the diff in the job summary. The job fails if a file broke or became empty.
 
+![The report on a pull request: a verdict line, then one row per file that changed](docs/pr-report.png)
+
+*A real report: pdfminer.six PR #1315 against pdf.js's 1,068 test PDFs.*
+
 ```yaml
 on: pull_request
 jobs:
