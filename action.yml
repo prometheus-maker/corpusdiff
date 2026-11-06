@@ -1,0 +1,121 @@
+name: corpusdiff
+description: Run a function over a public test corpus at the PR's base and head, and report what broke, got fixed or changed.
+author: Prometheus (an AI agent)
+branding:
+  icon: git-pull-request
+  color: orange
+inputs:
+  target:
+    description: "Function to call per file: 'package.module:function' or 'path/to/file.py:function' (relative to the repo root)"
+    required: true
+  corpus:
+    description: "Corpus to download (pdfjs, poi, pillow, tika, fate) or a folder in the repo"
+    required: true
+  install:
+    description: "Command that installs the project into the active Python (run once for base, once for head)"
+    default: "pip install ."
+  base:
+    description: "Git ref to compare against (default: the PR's base branch, else the previous commit)"
+    default: ""
+  jobs:
+    description: "Parallel workers"
+    default: "2"
+  timeout:
+    description: "Seconds per file"
+    default: "60"
+  ext:
+    description: "Only these extensions, e.g. pdf,docx"
+    default: ""
+  rerun:
+    description: "Run the base twice and set aside files whose result differs between those runs ('true'/'false')"
+    default: "false"
+  fail-on-broke:
+    description: "Fail the step if any file broke or became empty ('true'/'false')"
+    default: "true"
+outputs:
+  summary:
+    description: "First line of the diff, e.g. '1068 files in both runs: broke 1, fixed 2, same 1065'"
+    value: ${{ steps.diff.outputs.summary }}
+runs:
+  using: composite
+  steps:
+    - name: Install corpusdiff
+      shell: bash
+      run: |
+        python -m venv "$RUNNER_TEMP/cd-tool"
+        "$RUNNER_TEMP/cd-tool/bin/pip" install -q "$GITHUB_ACTION_PATH"
+        echo "CD=$RUNNER_TEMP/cd-tool/bin/corpusdiff" >> "$GITHUB_ENV"
+    - name: Resolve refs and corpus folder
+      id: prep
+      shell: bash
+      env:
+        IN_BASE: ${{ inputs.base }}
+        PR_BASE: ${{ github.event.pull_request.base.sha }}
+        IN_CORPUS: ${{ inputs.corpus }}
+      run: |
+        base="${IN_BASE:-${PR_BASE:-HEAD~1}}"
+        git fetch -q --depth=50 origin "$base" 2>/dev/null || true
+        git rev-parse --verify -q "$base^{commit}" >/dev/null || git fetch -q origin "$base"
+        echo "base=$(git rev-parse "$base^{commit}")" >> "$GITHUB_OUTPUT"
+        if [ -d "$IN_CORPUS" ]; then
+          echo "dir=$(cd "$IN_CORPUS" && pwd)" >> "$GITHUB_OUTPUT"; echo "fetch=" >> "$GITHUB_OUTPUT"
+        else
+          echo "dir=$RUNNER_TEMP/corpus-$IN_CORPUS" >> "$GITHUB_OUTPUT"; echo "fetch=$IN_CORPUS" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Cache corpus
+      if: steps.prep.outputs.fetch != ''
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.prep.outputs.dir }}
+        key: corpusdiff-corpus-${{ steps.prep.outputs.fetch }}-v1
+    - name: Fetch corpus
+      if: steps.prep.outputs.fetch != ''
+      shell: bash
+      run: |
+        [ -n "$(ls -A "${{ steps.prep.outputs.dir }}" 2>/dev/null)" ] || "$CD" fetch "${{ steps.prep.outputs.fetch }}" "${{ steps.prep.outputs.dir }}"
+    - name: Run base and head
+      shell: bash
+      env:
+        IN_TARGET: ${{ inputs.target }}
+        IN_INSTALL: ${{ inputs.install }}
+        IN_EXT: ${{ inputs.ext }}
+        IN_RERUN: ${{ inputs.rerun }}
+        IN_JOBS: ${{ inputs.jobs }}
+        IN_TIMEOUT: ${{ inputs.timeout }}
+        BASE_SHA: ${{ steps.prep.outputs.base }}
+        CORPUS_DIR: ${{ steps.prep.outputs.dir }}
+      run: |
+        set -euo pipefail
+        out="$RUNNER_TEMP/cd-results"; mkdir -p "$out"
+        # A file target is taken from this change for both runs, so a newly added target file works too.
+        case "$IN_TARGET" in *.py:*) IN_TARGET="$GITHUB_WORKSPACE/$IN_TARGET" ;; esac
+        git worktree add -q --detach "$RUNNER_TEMP/cd-base" "$BASE_SHA"
+        one() {  # one SRC_DIR NAME RESULT...
+          local src=$1 name=$2; shift 2
+          python -m venv "$RUNNER_TEMP/venv-$name"
+          (cd "$src" && source "$RUNNER_TEMP/venv-$name/bin/activate" && eval "$IN_INSTALL")
+          for res in "$@"; do
+            (cd "$src" && "$CD" run "$IN_TARGET" "$CORPUS_DIR" -o "$out/$res.jsonl" -q \
+              --python "$RUNNER_TEMP/venv-$name/bin/python" -j "$IN_JOBS" -t "$IN_TIMEOUT" \
+              ${IN_EXT:+--ext "$IN_EXT"} --save-outputs "$out/outputs")
+          done
+        }
+        if [ "$IN_RERUN" = "true" ]; then one "$RUNNER_TEMP/cd-base" base base base2; else one "$RUNNER_TEMP/cd-base" base base; fi
+        one "$GITHUB_WORKSPACE" head head
+    - name: Diff
+      id: diff
+      shell: bash
+      env:
+        IN_RERUN: ${{ inputs.rerun }}
+        IN_FAIL: ${{ inputs.fail-on-broke }}
+      run: |
+        out="$RUNNER_TEMP/cd-results"
+        extra=(); [ "$IN_RERUN" = "true" ] && extra=(--rerun "$out/base2.jsonl")
+        set +e
+        "$CD" diff "$out/base.jsonl" "$out/head.jsonl" "${extra[@]}" --outputs "$out/outputs" --lines 8 > "$out/diff.txt"
+        rc=$?
+        set -e
+        cat "$out/diff.txt"
+        echo "summary=$(head -n 1 "$out/diff.txt")" >> "$GITHUB_OUTPUT"
+        { echo "### corpusdiff: base vs this change"; echo '```'; head -c 60000 "$out/diff.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        if [ "$rc" -ne 0 ] && [ "$IN_FAIL" = "true" ]; then echo "::error::corpusdiff: files broke or became empty"; exit 1; fi

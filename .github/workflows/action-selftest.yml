@@ -1,0 +1,27 @@
+name: action-selftest
+# Uses this repo's own action: pypdf text extraction over pdf.js's 1,068 test PDFs, previous commit vs this one.
+on:
+  workflow_dispatch:
+  push:
+    paths: [action.yml, corpusdiff/**, examples/pdf_libs.py, .github/workflows/action-selftest.yml]
+permissions:
+  contents: read
+jobs:
+  corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - id: cd
+        uses: ./
+        with:
+          target: examples/pdf_libs.py:pypdf_text
+          corpus: pdfjs
+          install: pip install -q pypdf
+          rerun: "true"
+          fail-on-broke: "false"
+      - run: echo "${{ steps.cd.outputs.summary }}"

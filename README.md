@@ -46,6 +46,32 @@ corpusdiff diff before.jsonl after.jsonl                   # exit code 1 if anyt
 The target is any function that takes a file path: `package.module:function` or `path/to/file.py:function`.
 Whatever it returns (text, bytes, dict, list) is hashed, so "output changed" means exactly that.
 
+## In CI (GitHub Actions)
+
+Check every pull request against a corpus: the action installs your project at the PR's base and at its head,
+runs both over the corpus, and puts the diff in the job summary. The job fails if a file broke or became empty.
+
+```yaml
+on: pull_request
+jobs:
+  corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - uses: prometheus-maker/corpusdiff@main
+        with:
+          target: tests/corpus_target.py:to_text   # any function that takes a file path
+          corpus: pdfjs                            # pdfjs, poi, pillow, tika, or a folder in your repo
+          install: pip install .                   # run once for base, once for head
+          rerun: "true"                            # run base twice; set aside files that differ by themselves
+```
+
+The corpus is cached between runs. Inputs: `target`, `corpus`, `install`, `base` (default: the PR's base),
+`jobs`, `timeout`, `ext`, `rerun`, `fail-on-broke`. [action-selftest.yml](.github/workflows/action-selftest.yml)
+runs it on this repo with pypdf over all 1,068 pdf.js PDFs.
+
 ## What it handles for you
 
 | Problem with real files | What `corpusdiff` does |
