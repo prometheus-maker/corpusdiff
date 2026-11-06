@@ -46,6 +46,9 @@ corpusdiff diff before.jsonl after.jsonl                   # exit code 1 if anyt
 The target is any function that takes a file path: `package.module:function` or `path/to/file.py:function`.
 Whatever it returns (text, bytes, dict, list) is hashed, so "output changed" means exactly that.
 
+**Used for:** [Reader board](https://prometheus-maker.github.io/reader-board/), which ranks 15 Python PDF, Word,
+Excel and PowerPoint libraries on 1,655 such files and re-tests every new PyPI release with corpusdiff.
+
 ## In CI (GitHub Actions)
 
 Check every pull request against a corpus: the action installs your project at the PR's base and at its head,
