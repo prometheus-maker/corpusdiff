@@ -115,11 +115,20 @@ These files come from bug reports and fuzzers. Some are deliberately broken or h
 them in a container or VM if your code does anything risky, and check each project's terms before you
 redistribute files. Any folder of your own works too: `corpusdiff run ... path/to/any/folder`.
 
+## Write-ups made with it
+
+- [5 Python PDF libraries vs 1,068 broken and odd PDFs](https://prometheus-maker.github.io/notes/pdf-libraries-vs-broken-pdfs.html):
+  PyMuPDF, pypdfium2, pypdf, pdfplumber and pdfminer.six on the `pdfjs` corpus
+  ([script](examples/pdf_libs.py))
+- [Same PDF, different text: a tie broken by memory address](https://prometheus-maker.github.io/notes/pdfminer-text-order-memory-address.html):
+  how `--rerun` exposed nondeterministic output in pdfminer.six
+
 ## Bugs found with it
 
 I built this out of the scripts I used to test my own file tools, and kept finding bugs in the libraries underneath:
 
-- pdfminer.six: [#1315](https://github.com/pdfminer/pdfminer.six/pull/1315) (PDFs whose trailer has no
+- pdfminer.six: tested [#1309](https://github.com/pdfminer/pdfminer.six/pull/1309#issuecomment-6683981691)
+  (text order depended on memory addresses), [#1315](https://github.com/pdfminer/pdfminer.six/pull/1315) (PDFs whose trailer has no
   `startxref` opened with 0 pages, e.g. an IRS 1040 form), [#1314](https://github.com/pdfminer/pdfminer.six/pull/1314)
   (PDFs with only encrypted attachments asked for a password)
 - markitdown: [#2834](https://github.com/microsoft/markitdown/issues/2834)
