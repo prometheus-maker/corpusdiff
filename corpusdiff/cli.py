@@ -8,6 +8,7 @@ corpusdiff diff before.jsonl after.jsonl
 """
 
 import argparse
+import difflib
 import json
 import os
 import select
@@ -122,7 +123,7 @@ def cmd_run(a):
     if a.limit:
         todo = todo[: a.limit]
     total, lock, n = len(todo), threading.Lock(), [0]
-    print(f"{total} files to run ({len(done)} already in {out.name}), {a.jobs} worker(s)", file=sys.stderr)
+    print(f"{total} file(s) to run ({len(done)} already in {out.name}), {a.jobs} worker(s)", file=sys.stderr)
     fh = out.open("a")
     queue = iter(todo)
     t0 = time.perf_counter()
@@ -179,7 +180,7 @@ def print_summary(rows):
     bad = [r for r in rows.values() if not r["ok"]]
     empty = [r for r in ok if r.get("empty")]
     secs = sum(r.get("s", 0) for r in rows.values())
-    print(f"{len(rows)} files: {len(ok)} ok ({len(empty)} with empty output), {len(bad)} failed, {secs:.0f} s total")
+    print(f"{len(rows)} file(s): {len(ok)} ok ({len(empty)} with empty output), {len(bad)} failed, {secs:.0f} s total")
     for k, c in Counter(fail_key(r) for r in bad).most_common(12):
         ex = next(r["f"] for r in bad if fail_key(r) == k)
         print(f"  {c:5}  {k}   e.g. {ex}")
@@ -236,6 +237,57 @@ ORDER = [
 BAD = {"broke", "now-empty"}
 
 
+def read_output(dirs, h):
+    for d in dirs:
+        p = Path(d) / h
+        if p.exists():
+            return p.read_bytes()
+    return None
+
+
+def as_lines(data):
+    """Text as lines; JSON outputs flattened to 'key: value' lines, with multi-line strings spread out."""
+    text = data.decode("utf-8", "replace")
+    try:
+        obj = json.loads(text)
+    except ValueError:
+        return text.splitlines()
+    out = []
+
+    def walk(prefix, v):
+        if isinstance(v, dict):
+            for k in v:
+                walk(f"{prefix}.{k}" if prefix else str(k), v[k])
+        elif isinstance(v, list):
+            for i, x in enumerate(v):
+                walk(f"{prefix}[{i}]", x)
+        elif isinstance(v, str) and "\n" in v:
+            out.append(f"{prefix}:")
+            out.extend("  " + ln for ln in v.splitlines())
+        else:
+            out.append(f"{prefix}: {json.dumps(v, ensure_ascii=False)}")
+
+    walk("", obj)
+    return out
+
+
+def show_change(dirs, h_old, h_new, max_lines):
+    """Print the first changed lines between two saved outputs (saved with run --save-outputs)."""
+    a, b = read_output(dirs, h_old), read_output(dirs, h_new)
+    if a is None or b is None:
+        print(f"  {'':15}   (output not saved; use run --save-outputs DIR)")
+        return
+    if b"\0" in a[:8000] or b"\0" in b[:8000]:
+        print(f"  {'':15}   (binary output)")
+        return
+    lines = difflib.unified_diff(as_lines(a), as_lines(b), "old", "new", n=1, lineterm="")
+    lines = [ln for ln in lines if not ln.startswith(("---", "+++"))]
+    for ln in lines[:max_lines]:
+        print(f"  {'':15}   | {ln[:150]}")
+    if len(lines) > max_lines:
+        print(f"  {'':15}   | ... {len(lines) - max_lines} more diff lines (--lines N)")
+
+
 def cmd_diff(a):
     old, new = load(a.old), load(a.new)
     both = sorted(set(old) & set(new))
@@ -283,6 +335,8 @@ def cmd_diff(a):
                     return f"{r.get('out_len')} bytes, {r.get('s', 0):.2f}s"
 
                 print(f"  {k:15} {f}\n  {'':15}   {desc(o)}  ->  {desc(n)}")
+                if a.outputs and o.get("out_hash") and n.get("out_hash") and o["out_hash"] != n["out_hash"]:
+                    show_change(a.outputs, o["out_hash"], n["out_hash"], a.lines)
             if len(groups.get(k, [])) > a.show:
                 print(f"  {k:15} ... and {len(groups[k]) - a.show} more (--show N)")
     return 1 if any(groups.get(k) for k in BAD) else 0
@@ -336,6 +390,14 @@ def main(argv=None):
         metavar="RUN",
         help="a second run of the OLD code: files that differ from it are set aside as 'unstable'",
     )
+    d.add_argument(
+        "--outputs",
+        action="append",
+        default=[],
+        metavar="DIR",
+        help="folder(s) given to run --save-outputs: show what changed in each changed output",
+    )
+    d.add_argument("--lines", type=int, default=12, help="diff lines shown per changed file (12)")
     d.add_argument("--json", action="store_true")
     f = sub.add_parser("fetch", help="download a public test corpus ('corpusdiff fetch list' shows them)")
     f.add_argument("name", nargs="?", default="list")

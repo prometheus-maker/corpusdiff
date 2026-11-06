@@ -58,6 +58,27 @@ Whatever it returns (text, bytes, dict, list) is hashed, so "output changed" mea
 | Your code prints to stdout | Prints are kept away from the results (`--show-stderr` to see them) |
 | Comparing two versions of a library | `--python path/to/venv/bin/python` and `--path path/to/checkout` per run |
 
+To see *how* an output changed, save outputs in both runs and point `diff` at them:
+
+```
+$ corpusdiff run ... -o before.jsonl --save-outputs outs/
+$ corpusdiff run ... -o after.jsonl --save-outputs outs/
+$ corpusdiff diff before.jsonl after.jsonl --outputs outs/
+1 files in both runs: output-changed 1   time 0s -> 0s
+  output-changed  issue7020.pdf
+                    264 bytes, 0.01s  ->  264 bytes, 0.01s
+                    | @@ -25,5 +25,5 @@
+                    |    
+                    | +  Ü
+                    | +  
+                    |    Þ
+                    | -  
+                    | -  Ü
+```
+
+JSON outputs are shown as `key: value` lines, with multi-line strings spread out, so a dict with a `text` field
+diffs line by line.
+
 `corpusdiff summary run.jsonl` groups the failures of a single run by exception type and code location, so the
 first screen is a bug list:
 

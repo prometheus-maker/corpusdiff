@@ -92,3 +92,18 @@ def test_diff_ignores_moved_lines_and_sets_aside_unstable_files(tmp_path, capsys
     main(["diff", old, new, "--json", "--rerun", rerun])
     d = json.loads(capsys.readouterr().out)
     assert d["unstable"] == ["y"] and d["same"] == 1 and "output-changed" not in d
+
+
+def test_diff_shows_what_changed_in_saved_outputs(corpus, tmp_path, capsys):
+    for f in ("b.txt", "c.txt", "d.txt", "e.txt"):
+        (corpus / f).unlink()
+    saved = tmp_path / "outs"
+    old, new = tmp_path / "old.jsonl", tmp_path / "new.jsonl"
+    run("lines", corpus, old, "--save-outputs", str(saved))
+    (corpus / "a.txt").write_text("hello\nworld")
+    run("lines", corpus, new, "--save-outputs", str(saved))
+    capsys.readouterr()
+    main(["diff", str(old), str(new), "--outputs", str(saved)])
+    out = capsys.readouterr().out
+    assert "output-changed  a.txt" in out and "|   text:" not in out
+    assert "| +  WORLD" in out

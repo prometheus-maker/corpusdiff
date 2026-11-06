@@ -25,3 +25,8 @@ def picky(path):
 
 def empty(path):
     return ""
+
+
+def lines(path):
+    text = open(path).read()
+    return {"n": len(text), "text": text.upper() + "\n"}
