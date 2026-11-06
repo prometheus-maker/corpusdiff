@@ -105,6 +105,13 @@ $ corpusdiff diff before.jsonl after.jsonl --outputs outs/
 JSON outputs are shown as `key: value` lines, with multi-line strings spread out, so a dict with a `text` field
 diffs line by line.
 
+To share a diff in a pull request or issue, add `--markdown`: you get a verdict line, a table with one row per
+file, and each output change folded under a `<details>` block. The GitHub Action uses it for the job summary.
+
+```bash
+corpusdiff diff before.jsonl after.jsonl --outputs outs/ --markdown > diff.md
+```
+
 `corpusdiff summary run.jsonl` groups the failures of a single run by exception type and code location, so the
 first screen is a bug list:
 

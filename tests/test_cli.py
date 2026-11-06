@@ -140,3 +140,28 @@ def test_memory_limit_kills_only_the_hungry_file(tmp_path):
     r = rows(out)
     assert r["a.txt"]["ok"]
     assert r["b.txt"]["etype"] == "MEMORY" and r["b.txt"]["s"] < 5
+
+
+def test_markdown_report_for_pr_comments(corpus, tmp_path, capsys):
+    for f in ("c.txt", "d.txt", "e.txt"):
+        (corpus / f).unlink()
+    saved = tmp_path / "outs"
+    old, new = tmp_path / "old.jsonl", tmp_path / "new.jsonl"
+    run("lines", corpus, old, "--save-outputs", str(saved))
+    (corpus / "a.txt").write_text("hello\nworld")
+    run("lines", corpus, new, "--save-outputs", str(saved))
+    capsys.readouterr()
+    assert main(["diff", str(old), str(new), "--outputs", str(saved), "--markdown"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("### corpusdiff: ✅ nothing broke")
+    assert "| ✏️ output-changed | `a.txt` |" in out
+    assert "```diff\n" in out and "+  WORLD" in out and "</details>" in out
+    assert "github.com/prometheus-maker/corpusdiff" in out
+    # pipes and backticks in names or messages must not break the table
+    err = {"f": "a|b`.txt", "ok": False, "etype": "ValueError", "msg": "x | y"}
+    ok = {"f": "a|b`.txt", "ok": True, "out_hash": "1", "out_len": 3, "empty": False}
+    (tmp_path / "o.jsonl").write_text(json.dumps(ok) + "\n")
+    (tmp_path / "n.jsonl").write_text(json.dumps(err) + "\n")
+    assert main(["diff", str(tmp_path / "o.jsonl"), str(tmp_path / "n.jsonl"), "--markdown"]) == 1
+    out = capsys.readouterr().out
+    assert "❌ 1 file(s) broke" in out and "| ❌ broke | `a\\|b'.txt` |" in out and "x \\| y" in out

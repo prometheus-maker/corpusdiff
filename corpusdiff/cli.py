@@ -297,21 +297,75 @@ def as_lines(data):
     return out
 
 
-def show_change(dirs, h_old, h_new, max_lines):
-    """Print the first changed lines between two saved outputs (saved with run --save-outputs)."""
+def change_lines(dirs, h_old, h_new, max_lines):
+    """The first changed lines between two saved outputs (saved with run --save-outputs), or one note in ()."""
     a, b = read_output(dirs, h_old), read_output(dirs, h_new)
     if a is None or b is None:
-        print(f"  {'':15}   (output not saved; use run --save-outputs DIR)")
-        return
+        return ["(output not saved; use run --save-outputs DIR)"]
     if b"\0" in a[:8000] or b"\0" in b[:8000]:
-        print(f"  {'':15}   (binary output)")
-        return
+        return ["(binary output)"]
     lines = difflib.unified_diff(as_lines(a), as_lines(b), "old", "new", n=1, lineterm="")
-    lines = [ln for ln in lines if not ln.startswith(("---", "+++"))]
-    for ln in lines[:max_lines]:
-        print(f"  {'':15}   | {ln[:150]}")
+    lines = [ln[:150] for ln in lines if not ln.startswith(("---", "+++"))]
     if len(lines) > max_lines:
-        print(f"  {'':15}   | ... {len(lines) - max_lines} more diff lines (--lines N)")
+        return lines[:max_lines] + [f"... {len(lines) - max_lines} more diff lines (--lines N)"]
+    return lines
+
+
+def describe(r):
+    if not r["ok"]:
+        return f"{r.get('etype')}: {r.get('msg', '')[:70]}"
+    return f"{r.get('out_len')} bytes, {r.get('s', 0):.2f}s"
+
+
+ICON = {
+    "broke": "❌",
+    "now-empty": "⚪",
+    "error-changed": "🔀",
+    "output-changed": "✏️",
+    "slower": "🐢",
+    "fixed": "✅",
+    "now-has-output": "🌱",
+    "faster": "⚡",
+    "unstable": "🎲",
+}
+REPO_URL = "https://github.com/prometheus-maker/corpusdiff"
+
+
+def md_cell(text):
+    """Text safe inside a Markdown table cell or inline code span."""
+    return str(text).replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ").replace("`", "'")
+
+
+def print_markdown(groups, old, new, both, a):
+    """Markdown report for PR comments and CI job summaries: verdict, counts, one row per file, diffs folded."""
+    t_old, t_new = (sum(r[f].get("s", 0) for f in both) for r in (old, new))
+    bad = sum(len(groups.get(k, [])) for k in BAD)
+    print(f"### corpusdiff: {f'❌ {bad} file(s) broke or became empty' if bad else '✅ nothing broke'}\n")
+    counts = [f"{ICON[k]} {k} **{len(groups[k])}**" for k in ORDER if k in groups]
+    counts.append(f"same {len(groups.get('same', []))}")
+    print(f"{len(both)} files in both runs: {' · '.join(counts)}  ")
+    print(f"Total time {t_old:.0f}s → {t_new:.0f}s")
+    if set(old) ^ set(new):
+        print(f"\nOnly in old: {len(set(old) - set(new))}, only in new: {len(set(new) - set(old))}")
+    rows, details, fence = [], [], "`" * 3
+    for k in ORDER:
+        for f in groups.get(k, [])[: a.show]:
+            o, n = old[f], new[f]
+            rows.append(f"| {ICON[k]} {k} | `{md_cell(f)}` | {md_cell(describe(o))} | {md_cell(describe(n))} |")
+            if a.outputs and o.get("out_hash") and n.get("out_hash") and o["out_hash"] != n["out_hash"]:
+                body = "\n".join(change_lines(a.outputs, o["out_hash"], n["out_hash"], a.lines)).replace(fence, "'''")
+                details.append(
+                    f"<details><summary><code>{md_cell(f)}</code>: what changed</summary>\n\n"
+                    f"{fence}diff\n{body}\n{fence}\n</details>"
+                )
+        if len(groups.get(k, [])) > a.show:
+            rows.append(f"| {ICON[k]} {k} | ... and {len(groups[k]) - a.show} more (--show N) | | |")
+    if rows:
+        print("\n| | File | Before | After |\n|---|---|---|---|")
+        print("\n".join(rows))
+    if details:
+        print("\n" + "\n".join(details))
+    print(f"\n<sub>Made with [corpusdiff]({REPO_URL})</sub>")
 
 
 def cmd_diff(a):
@@ -342,6 +396,8 @@ def cmd_diff(a):
             indent=1,
         )
         print()
+    elif a.markdown:
+        print_markdown(groups, old, new, both, a)
     else:
         t_old, t_new = (sum(r[f].get("s", 0) for f in both) for r in (old, new))
         print(
@@ -354,15 +410,10 @@ def cmd_diff(a):
         for k in ORDER:
             for f in groups.get(k, [])[: a.show]:
                 o, n = old[f], new[f]
-
-                def desc(r):
-                    if not r["ok"]:
-                        return f"{r.get('etype')}: {r.get('msg', '')[:70]}"
-                    return f"{r.get('out_len')} bytes, {r.get('s', 0):.2f}s"
-
-                print(f"  {k:15} {f}\n  {'':15}   {desc(o)}  ->  {desc(n)}")
+                print(f"  {k:15} {f}\n  {'':15}   {describe(o)}  ->  {describe(n)}")
                 if a.outputs and o.get("out_hash") and n.get("out_hash") and o["out_hash"] != n["out_hash"]:
-                    show_change(a.outputs, o["out_hash"], n["out_hash"], a.lines)
+                    for ln in change_lines(a.outputs, o["out_hash"], n["out_hash"], a.lines):
+                        print(f"  {'':15}   {ln}" if ln.startswith("(") else f"  {'':15}   | {ln}")
             if len(groups.get(k, [])) > a.show:
                 print(f"  {k:15} ... and {len(groups[k]) - a.show} more (--show N)")
     return 1 if any(groups.get(k) for k in BAD) else 0
@@ -430,6 +481,7 @@ def main(argv=None):
     )
     d.add_argument("--lines", type=int, default=12, help="diff lines shown per changed file (12)")
     d.add_argument("--json", action="store_true")
+    d.add_argument("--markdown", action="store_true", help="Markdown report for PR comments and CI job summaries")
     f = sub.add_parser("fetch", help="download a public test corpus ('corpusdiff fetch list' shows them)")
     f.add_argument("name", nargs="?", default="list")
     f.add_argument("dest", nargs="?")

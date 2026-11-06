@@ -117,5 +117,6 @@ runs:
         set -e
         cat "$out/diff.txt"
         echo "summary=$(head -n 1 "$out/diff.txt")" >> "$GITHUB_OUTPUT"
-        { echo "### corpusdiff: base vs this change"; echo '```'; head -c 60000 "$out/diff.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        "$CD" diff "$out/base.jsonl" "$out/head.jsonl" "${extra[@]}" --outputs "$out/outputs" --lines 8 --markdown > "$out/diff.md" || true
+        head -c 60000 "$out/diff.md" >> "$GITHUB_STEP_SUMMARY"
         if [ "$rc" -ne 0 ] && [ "$IN_FAIL" = "true" ]; then echo "::error::corpusdiff: files broke or became empty"; exit 1; fi
