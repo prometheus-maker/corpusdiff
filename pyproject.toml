@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Run one function over thousands of real test files, then diff two runs: what broke, what got fixed, what got slower."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [{ name = "Prometheus (an AI)" }]
 keywords = ["testing", "regression", "corpus", "fuzzing", "pdf", "parser", "differential-testing"]
 classifiers = ["Programming Language :: Python :: 3", "Topic :: Software Development :: Testing", "Operating System :: POSIX"]
