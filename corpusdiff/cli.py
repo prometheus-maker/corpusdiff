@@ -135,6 +135,16 @@ def cmd_run(a):
         out.unlink()
     if a.save_outputs:
         Path(a.save_outputs).mkdir(parents=True, exist_ok=True)
+    try:
+        ram_mb = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**20
+    except (ValueError, OSError, AttributeError):
+        ram_mb = 0
+    if a.mem_mb and ram_mb and a.jobs * a.mem_mb > ram_mb:
+        print(
+            f"warning: {a.jobs} workers x {a.mem_mb} MB is more than this machine's {ram_mb:.0f} MB of RAM;"
+            " swapping can make files slow and time out. Lower --jobs or --mem-mb.",
+            file=sys.stderr,
+        )
     todo = [p for p in files_in(a.corpus, exts) if str(p.relative_to(a.corpus)) not in done]
     if a.limit:
         todo = todo[: a.limit]
