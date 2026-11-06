@@ -5,12 +5,27 @@ thousands of test files, then compares two runs. You get the files that broke, g
 empty or got slower.
 
 ```
-$ corpusdiff diff master.jsonl fix.jsonl
-__RESULT__
+$ corpusdiff diff master.jsonl fix.jsonl --rerun master2.jsonl
+1068 files in both runs: output-changed 1, fixed 1, unstable 4, same 1062   time 241s -> 238s
+  output-changed  prefilled_f1040.pdf
+                    24 bytes, 0.02s  ->  11424 bytes, 2.41s
+  fixed           issue15590.pdf
+                    PDFSyntaxError: No /Root object! - Is this really a PDF?  ->  24 bytes, 0.00s
+  unstable        issue6231_1.pdf
+                    172 bytes, 0.03s  ->  172 bytes, 0.03s
+  unstable        issue7020.pdf
+                    264 bytes, 0.01s  ->  264 bytes, 0.01s
+  unstable        perf_text_labels.pdf
+                    29123 bytes, 90.62s  ->  29123 bytes, 90.53s
+  unstable        perf_text_transformed.pdf
+                    28956 bytes, 20.89s  ->  28956 bytes, 20.62s
 ```
 
 That is a real run: [pdfminer.six PR #1315](https://github.com/pdfminer/pdfminer.six/pull/1315) checked against all
-1,068 PDFs in Mozilla pdf.js's test suite.
+1,068 PDFs in Mozilla pdf.js's test suite. An IRS 1040 form went from 0 pages to 2 pages with text,
+one broken file opens instead of raising, nothing broke. Four files gave different text in two runs of the
+*unchanged* library (`master2.jsonl` is a second run of master); `--rerun` sets those aside so they don't look like
+changes.
 
 ## Why
 
@@ -48,7 +63,19 @@ first screen is a bug list:
 
 ```
 $ corpusdiff summary master.jsonl
-__SUMMARY__
+1068 files: 1037 ok (0 with empty output), 31 failed, 241 s total
+     11  PDFPasswordIncorrect  @ pdfminer/pdfdocument.py:370 in init_key   e.g. auth-event-ef-open.pdf
+      5  PSSyntaxError  @ pdfminer/psparser.py:605 in nextobject   e.g. bug1020226.pdf
+      5  PDFSyntaxError  @ pdfminer/pdfdocument.py:745 in __init__   e.g. bug1250079.pdf
+      2  PDFEncryptionError  @ pdfminer/pdfdocument.py:487 in init_params   e.g. bug1782186.pdf
+      2  Error  @ pdfminer/ascii85.py:48 in asciihexdecode   e.g. issue6108.pdf
+      1  PDFNotImplementedError  @ pdfminer/pdftypes.py:361 in decode   e.g. Brotli-Prototype-FileA.pdf
+      1  ValueError  @ base64.py:433 in a85decode   e.g. PDFBOX-3148-2-fuzzed.pdf
+      1  PDFEncryptionError  @ pdfminer/pdfdocument.py:757 in _initialize_password   e.g. PDFBOX-4352-0.pdf
+      1  TypeError  @ pdfminer/layout.py:957 in __init__   e.g. franz_2.pdf
+      1  TypeError  @ pdfminer/pdfdocument.py:490 in init_params   e.g. issue7665.pdf
+      1  ValueError  @ base64.py:419 in a85decode   e.g. poppler-395-0-fuzzed.pdf
+  slowest: perf_text_labels.pdf 90.6s, perf_text_transformed.pdf 20.9s, bug1978317.pdf 20.6s, freeculture.pdf 12.6s, issue12295.pdf 5.1s
 ```
 
 ## Corpora
@@ -77,17 +104,24 @@ I built this out of the scripts I used to test my own file tools, and kept findi
 - My own tools: a Word file that took 32 s, rotated scans with no text, a decoder segfault on an audio stream
   without a decoder.
 
+## "Unstable" files
+
+If a file's result changes between two runs of the same code, `diff` can't tell your change from noise. Run the old
+version twice and pass the second run with `--rerun`. Unstable results usually mean state shared between calls
+(a cache, a global), since workers handle many files each. Try `--fresh` (one process per file) to confirm.
+
 ## Results format
 
 One JSON line per file:
 
 ```json
-{"f": "issue7665.pdf", "bytes": 36178, "ok": false, "etype": "TypeError",
- "msg": "'PDFObjRef' object is not subscriptable", "where": ["pdfminer/pdfpage.py:85 in __init__"], "s": 0.02, "peak_mb": 51}
+{"f": "issue7665.pdf", "bytes": 1472, "ok": false, "etype": "TypeError", "msg": "'PDFObjRef' object is not subscriptable",
+ "where": ["pdfminer/pdfdocument.py:353 in init", "pdfminer/pdfdocument.py:552 in init_params", "pdfminer/pdfdocument.py:490 in init_params"], "s": 0.001, "peak_mb": 118}
 ```
 
 `ok`, `out_len`, `out_hash`, `empty` for successes; `etype`, `msg`, `where` (last 3 frames) for failures;
-`etype` is `TIMEOUT` or `CRASH` when the worker had to be killed or died. `peak_mb` is the worker's peak memory
+`etype` is `TIMEOUT` or `CRASH` when the worker had to be killed or died. Stack frames are shown relative to the
+import root, and `diff` matches errors by type, file and function, so moved line numbers don't count as changes. `peak_mb` is the worker's peak memory
 so far (exact per file with `--fresh`).
 
 Linux and macOS. Standard library only.

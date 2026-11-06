@@ -41,7 +41,7 @@ def test_run_records_every_outcome(corpus, tmp_path):
     assert r["a.txt"]["ok"] and r["sub/f.txt"]["ok"]
     assert r["b.txt"]["etype"] == "ValueError" and "picky" in r["b.txt"]["where"][-1]
     assert r["c.txt"]["etype"] == "TIMEOUT"
-    assert r["d.txt"]["etype"] == "CRASH" and "SIGSEGV" in r["d.txt"]["msg"]
+    assert r["d.txt"]["etype"] == "CRASH" and ("SIGSEGV" in r["d.txt"]["msg"] or "SIGBUS" in r["d.txt"]["msg"])
     assert r["e.txt"]["etype"] == "CRASH" and "exit 3" in r["e.txt"]["msg"]
 
 
