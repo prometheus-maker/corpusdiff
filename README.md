@@ -151,6 +151,7 @@ $ corpusdiff summary master.jsonl
 | `poi` | ~650 Word, Excel and PowerPoint files: real bug files, encrypted, malformed, XXE | [apache/poi](https://github.com/apache/poi/tree/trunk/test-data) |
 | `pillow` | ~1,000 images: odd modes, truncated, huge, JPEG 2000, TIFF variants | [python-pillow/Pillow](https://github.com/python-pillow/Pillow/tree/main/Tests/images) |
 | `tika` | ~1,200 files with ~290 file extensions from Apache Tika's parser tests: Office, PDF, RTF, EPUB, email, archives, audio, CAD (one folder per Tika module) | [apache/tika](https://github.com/apache/tika) |
+| `ocr` | 190 images with ground-truth text next to each (`NAME.gt.txt`): receipt photos, document pages, app screenshots. For OCR accuracy, with `metrics` (see Results format) | [prometheus-maker/ocr-testset](https://github.com/prometheus-maker/ocr-testset) |
 | `fate` | FFmpeg's sample suite, per codec/container folder (`--only aac,mp3-conformance`) | [fate-suite.ffmpeg.org](https://fate-suite.ffmpeg.org/) |
 
 These files come from bug reports and fuzzers. Some are deliberately broken or hostile (zip bombs, XXE), so run

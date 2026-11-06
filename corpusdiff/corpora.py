@@ -44,6 +44,14 @@ CORPORA = {
         "github": ("apache/tika", "main", {"marker": "/src/test/resources/test-documents/"}),
         "ext": None,
     },
+    "ocr": {
+        "what": "190 images with ground-truth text (NAME.gt.txt): 80 receipt photos (CORD), 50 document pages "
+        "(DocLayNet), 60 app screenshots; for OCR accuracy",
+        "home": "https://github.com/prometheus-maker/ocr-testset",
+        "licence": "CC BY 4.0 (receipts), CDLA-Permissive-1.0 (documents), CC0 (screenshots)",
+        "github": ("prometheus-maker/ocr-testset", "main", [""]),
+        "ext": {".jpg", ".png", ".txt"},
+    },
     "fate": {
         "what": "FFmpeg's FATE suite: audio/video samples per codec and container (pick folders with --only)",
         "home": "https://fate-suite.ffmpeg.org/",
