@@ -424,7 +424,7 @@ def cmd_fetch(a):
         for name, c in corpora.CORPORA.items():
             print(f"{name:8} {c['what']}\n{'':8} source: {c['home']}   licence: {c['licence']}")
         return 0
-    corpora.fetch(a.name, a.dest or f"corpora/{a.name}", only=a.only)
+    corpora.fetch(a.name, a.dest or f"corpora/{a.name}", only=a.only, ref=a.ref)
     return 0
 
 
@@ -486,6 +486,8 @@ def main(argv=None):
     f.add_argument("name", nargs="?", default="list")
     f.add_argument("dest", nargs="?")
     f.add_argument("--only", help="comma-separated sub-folders (for fate: e.g. aac,mp3-conformance)")
+    f.add_argument("--ref", help="branch, tag or commit to download (GitHub corpora; default: main branch). "
+                   "The commit used is saved in DEST/.corpusdiff-source.json")
     a = ap.parse_args(argv)
     return {"run": cmd_run, "summary": cmd_summary, "diff": cmd_diff, "fetch": cmd_fetch}[a.cmd](a) or 0
 

@@ -72,7 +72,9 @@ def rel_path(path, where):
     return next((path[len(p) :] for p in where if path.startswith(p)), None)
 
 
-def fetch(name, dest, only=None):
+def fetch(name, dest, only=None, ref=None):
+    """Download corpus `name` into dest. ref: branch, tag or commit (default: the corpus's main branch).
+    The commit actually used is written to dest/.corpusdiff-source.json, so a run can be repeated exactly."""
     if name not in CORPORA:
         raise SystemExit(f"unknown corpus {name!r}; known: {', '.join(CORPORA)}")
     c, dest = CORPORA[name], Path(dest)
@@ -86,7 +88,9 @@ def fetch(name, dest, only=None):
                 ["rsync", "-a", "--timeout=120", c["rsync"] + d.strip() + "/", str(dest / d.strip())], check=True
             )
         return
-    repo, ref, where = c["github"]
+    repo, branch, where = c["github"]
+    sha = json.loads(_get(f"https://api.github.com/repos/{repo}/commits/{urllib.parse.quote(ref or branch)}"))["sha"]
+    ref = sha  # every file from the same commit, even if the branch moves during the download
     tree = json.loads(_get(f"https://api.github.com/repos/{repo}/git/trees/{ref}?recursive=1"))
     if tree.get("truncated"):
         print("warning: GitHub returned a truncated file list", file=sys.stderr)
@@ -115,4 +119,6 @@ def fetch(name, dest, only=None):
     print(f"{len(want)} files from {repo} -> {dest}", file=sys.stderr)
     with ThreadPoolExecutor(8) as ex:
         new = sum(ex.map(one, want))
-    print(f"downloaded {new}, already had {len(want) - new}", file=sys.stderr)
+    print(f"downloaded {new}, already had {len(want) - new} (commit {sha[:12]})", file=sys.stderr)
+    src = {"corpus": name, "repo": repo, "commit": sha, "files": len(want), "only": only}
+    (dest / ".corpusdiff-source.json").write_text(json.dumps(src, indent=1) + "\n")

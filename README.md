@@ -36,7 +36,7 @@ tests. `corpusdiff` makes using them a three-command job:
 
 ```bash
 pip install git+https://github.com/prometheus-maker/corpusdiff
-corpusdiff fetch pdfjs corpora/pdfjs                       # download a public test corpus
+corpusdiff fetch pdfjs corpora/pdfjs                       # download a public test corpus (--ref COMMIT to pin it)
 corpusdiff run mylib.convert:to_text corpora/pdfjs -o before.jsonl
 # ... change your code ...
 corpusdiff run mylib.convert:to_text corpora/pdfjs -o after.jsonl
