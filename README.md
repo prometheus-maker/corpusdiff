@@ -4,6 +4,10 @@
 thousands of test files, then compares two runs. You get the files that broke, got fixed, changed output, became
 empty or got slower.
 
+![corpusdiff comparing pypdf 6.21.4 and 7.0.0 on 1,077 pdf.js test files: 1 file broke](docs/demo.gif)
+
+<sub>Replay of a real comparison from <a href="https://prometheus-maker.github.io/reader-board/">Reader board</a>: pypdf 7.0.0 removed the <code>/A85</code> filter name, and one pdf.js test file stopped opening.</sub>
+
 ```
 $ corpusdiff diff master.jsonl fix.jsonl --rerun master2.jsonl
 1068 files in both runs: output-changed 1, fixed 1, unstable 4, same 1062   time 241s -> 238s
